@@ -1,10 +1,13 @@
-from typing import Literal
+import logging
 import uuid
 import lightning
 import torch
 import numpy as np
 import ray
+import argparse
+import wandb
 
+from typing import Literal
 from torch.utils.data import DataLoader, Dataset
 from sklearn.datasets import load_iris
 from sklearn.model_selection import train_test_split
@@ -15,7 +18,6 @@ from ray.train.lightning import (
     RayLightningEnvironment,
     RayTrainReportCallback,
 )
-import wandb
 
 DEFAULT_WANDB_PROJECT = "hanging-runs-test"
 LoggerType = Literal["ray", "lightning"]
@@ -197,3 +199,36 @@ def hpo(
     wandb.finish()
 
     return best_result
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Run HPO experiments")
+    parser.add_argument("--num_epochs", type=int, default=10, help="Number of epochs")
+    parser.add_argument(
+        "--logger",
+        type=str,
+        choices=["ray", "lightning"],
+        default="lightning",
+        help="Logger to use",
+    )
+    parser.add_argument(
+        "--wandb_project",
+        type=str,
+        default=DEFAULT_WANDB_PROJECT,
+        help="WandB project name",
+    )
+    parser.add_argument("--num_samples", type=int, default=10, help="Number of samples")
+    parser.add_argument("--log_level", type=str, default="INFO", help="Logging level")
+
+    args = parser.parse_args()
+
+    logging.basicConfig(level=args.log_level)
+
+    hpo_result = hpo(
+        num_epochs=args.num_epochs,
+        logger=args.logger,
+        wandb_project=args.wandb_project,
+        num_samples=args.num_samples,
+    )
+
+    logging.info("HPO result metrics: %s", hpo_result.metrics)
