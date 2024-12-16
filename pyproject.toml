@@ -10,6 +10,7 @@ dependencies = [
     "lightning>=2.4.0",
     "numpy>=2.2.0",
     "ray[tune]>=2.40.0",
+    "ruff>=0.8.3",
     "scikit-learn>=1.6.0",
     "torch>=2.5.1",
     "torchvision>=0.20.1",

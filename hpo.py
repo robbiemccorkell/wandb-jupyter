@@ -1,4 +1,5 @@
 from typing import Literal
+import uuid
 import lightning
 import torch
 import numpy as np
@@ -14,8 +15,9 @@ from ray.train.lightning import (
     RayLightningEnvironment,
     RayTrainReportCallback,
 )
+import wandb
 
-WANDB_PROJECT = "hanging-runs-test"
+DEFAULT_WANDB_PROJECT = "hanging-runs-test"
 LoggerType = Literal["ray", "lightning"]
 
 
@@ -104,7 +106,7 @@ class FullyConnectedNet(lightning.LightningModule):
 
 
 # Training function to be passed to Ray Tune
-def train_tune(config, num_epochs, logger: LoggerType):
+def train_tune(config, num_epochs, logger: LoggerType, wandb_project: str):
     # Set up data module with batch size from config
     iris_dm = IrisDataModule(batch_size=int(config["batch_size"]))
     iris_dm.prepare_data()
@@ -124,7 +126,7 @@ def train_tune(config, num_epochs, logger: LoggerType):
         # Use Lightning WandbLogger
         # In combination with Ray Tune, this seems to leave runs in a 'running' state
         # after an HPO trial has ended
-        logger=WandbLogger(project=WANDB_PROJECT, log_model=False)
+        logger=WandbLogger(project=wandb_project, log_model=False)
         if logger == "lightning"
         else None,
         enable_progress_bar=False,
@@ -136,7 +138,27 @@ def train_tune(config, num_epochs, logger: LoggerType):
     trainer.fit(model, iris_dm)
 
 
-def hpo(num_samples=10, num_epochs=1000, logger: LoggerType = "lightning"):
+def hpo(
+    num_samples=10,
+    num_epochs=1000,
+    logger: LoggerType = "lightning",
+    wandb_project=DEFAULT_WANDB_PROJECT,
+):
+    # Generate a unique id for this run
+    run_id = str(uuid.uuid4()).split("-")[0]
+
+    # Start a wandb log for the whole training run
+    wandb.init(
+        project=wandb_project,
+        name=f"{run_id}-train",
+        config={
+            "num_samples": num_samples,
+            "num_epochs": num_epochs,
+            "logger": logger,
+        },
+        tags=["train"],
+    )
+
     # Define the search space
     search_space = {
         "hidden_dim": ray.tune.choice([16, 32, 64, 128]),
@@ -150,6 +172,7 @@ def hpo(num_samples=10, num_epochs=1000, logger: LoggerType = "lightning"):
             train_tune,
             num_epochs=num_epochs,
             logger=logger,
+            wandb_project=wandb_project,
         ),
         param_space=search_space,
         tune_config=ray.tune.TuneConfig(
@@ -159,7 +182,7 @@ def hpo(num_samples=10, num_epochs=1000, logger: LoggerType = "lightning"):
         ),
         # This logger correctly ends the run after an HPO trial has ended
         run_config=ray.train.RunConfig(
-            callbacks=[WandbLoggerCallback(project=WANDB_PROJECT)]
+            callbacks=[WandbLoggerCallback(project=wandb_project)]
         )
         if logger == "ray"
         else None,
@@ -169,3 +192,8 @@ def hpo(num_samples=10, num_epochs=1000, logger: LoggerType = "lightning"):
     # Get the best trial
     best_result = results.get_best_result("val_loss", "min")
     print("Best hyperparameters found were: ", best_result.config)
+
+    wandb.log({"train_metrics": best_result.metrics})
+    wandb.finish()
+
+    return best_result
