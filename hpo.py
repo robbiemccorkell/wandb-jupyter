@@ -141,8 +141,8 @@ def train_tune(config, num_epochs, logger: LoggerType, wandb_project: str):
 
 
 def hpo(
-    num_samples=10,
-    num_epochs=1000,
+    num_samples=5,
+    num_epochs=100,
     logger: LoggerType = "lightning",
     wandb_project=DEFAULT_WANDB_PROJECT,
 ):
@@ -203,7 +203,7 @@ def hpo(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run HPO experiments")
-    parser.add_argument("--num_epochs", type=int, default=10, help="Number of epochs")
+    parser.add_argument("--num_epochs", type=int, default=100, help="Number of epochs")
     parser.add_argument(
         "--logger",
         type=str,
@@ -217,7 +217,7 @@ if __name__ == "__main__":
         default=DEFAULT_WANDB_PROJECT,
         help="WandB project name",
     )
-    parser.add_argument("--num_samples", type=int, default=10, help="Number of samples")
+    parser.add_argument("--num_samples", type=int, default=5, help="Number of samples")
     parser.add_argument("--log_level", type=str, default="INFO", help="Logging level")
 
     args = parser.parse_args()
